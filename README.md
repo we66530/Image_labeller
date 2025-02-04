@@ -1,5 +1,5 @@
 # Image_labeller
-![Model will choose the picture with conversation fit your input](./example.png)
+![Model will choose the picture with conversation fit your input](./sample.png)
 ## How to start
 ```bash
 cd Desktop\Img_Labeller
