@@ -1,5 +1,5 @@
 # 🚀 Update
-02/04: labeller_v2.py now includes a feature that allows users to directly select images for import and specify the save location for masks with just a few simple clicks.
+02/04: ```labeller_v2.py``` now includes a feature that allows users to directly select images for import and specify the save location for masks with just a few simple clicks.
 # Image_labeller
 ![Model will choose the picture with conversation fit your input](./sample.png)
 ## How to start
