@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Online Image Mask Annotator</title>
+<style>
+  body { background: #222; color: white; font-family: sans-serif; text-align: center; }
+  #controls { margin: 10px; }
+  canvas { border: 1px solid white; cursor: crosshair; }
+</style>
+</head>
+<body>
+
+<h2>Online Image Mask Annotator</h2>
+
+<div id="controls">
+  <input type="file" id="upload" accept="image/*"><br><br>
+
+  Brush Size:
+  <input type="range" id="brush" min="2" max="50" value="10">
+  <span id="brushVal">10</span>
+
+  &nbsp;&nbsp; Class:
+  <select id="classSelect"></select>
+
+  &nbsp;&nbsp; Zoom:
+  <button onclick="zoom(1)">+</button>
+  <button onclick="zoom(-1)">-</button>
+
+  &nbsp;&nbsp; 
+  <button onclick="undo()">Undo</button>
+  <button onclick="downloadMask()">Download Mask</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+/* ==== CONFIG ==== */
+const classColors = {
+  1: [255, 0, 0],
+  2: [0, 255, 0],
+  3: [0, 0, 255]
+};
+
+/* ==== DOM ==== */
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const upload = document.getElementById("upload");
+const brushSlider = document.getElementById("brush");
+const brushVal = document.getElementById("brushVal");
+const classSelect = document.getElementById("classSelect");
+
+/* ==== STATE ==== */
+let img = null;
+let maskCanvas = document.createElement("canvas");   // stores class id mask
+let maskCtx = maskCanvas.getContext("2d");
+
+let scale = 1.0;
+let offsetX = 0, offsetY = 0;
+let isPanning = false, isDrawing = false;
+let startX = 0, startY = 0;
+let history = [];
+let currentClass = 1;
+
+/* ==== INIT ==== */
+Object.keys(classColors).forEach(c => {
+  let opt = document.createElement("option");
+  opt.value = c;
+  opt.text = "Class " + c;
+  classSelect.add(opt);
+});
+
+/* ==== Load image ==== */
+upload.onchange = function(e) {
+  let file = e.target.files[0];
+  if (!file) return;
+
+  let reader = new FileReader();
+  reader.onload = function(ev) {
+    img = new Image();
+    img.onload = function() {
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      maskCanvas.width = img.width;
+      maskCanvas.height = img.height;
+      maskCtx.clearRect(0, 0, img.width, img.height);
+
+      draw();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+/* ==== Brush size change ==== */
+brushSlider.oninput = function() {
+  brushVal.innerText = this.value;
+};
+
+/* ==== Class selection ==== */
+classSelect.onchange = () => currentClass = parseInt(classSelect.value);
+
+/* ==== Canvas events ==== */
+canvas.onmousedown = function(e) {
+  if (!img) return;
+
+  let x = (e.offsetX - offsetX) / scale;
+  let y = (e.offsetY - offsetY) / scale;
+
+  if (e.button === 1 || e.shiftKey) {
+    isPanning = true;
+  } else {
+    isDrawing = true;
+    history.push(maskCtx.getImageData(0,0,maskCanvas.width,maskCanvas.height));
+
+    drawDot(x, y);
+  }
+
+  startX = e.offsetX;
+  startY = e.offsetY;
+};
+
+canvas.onmousemove = function(e) {
+  if (!img) return;
+
+  let x = (e.offsetX - offsetX) / scale;
+  let y = (e.offsetY - offsetY) / scale;
+
+  if (isDrawing) {
+    drawDot(x, y);
+  }
+
+  if (isPanning) {
+    offsetX += (e.offsetX - startX);
+    offsetY += (e.offsetY - startY);
+    startX = e.offsetX;
+    startY = e.offsetY;
+    draw();
+  }
+};
+
+canvas.onmouseup = () => { isDrawing = false; isPanning = false; };
+
+/* ==== Drawing onto mask ==== */
+function drawDot(x, y) {
+  let size = parseInt(brushSlider.value);
+
+  maskCtx.fillStyle = "rgb(" + classColors[currentClass].join(",") + ")";
+  maskCtx.beginPath();
+  maskCtx.arc(x, y, size, 0, Math.PI * 2);
+  maskCtx.fill();
+
+  draw();
+}
+
+/* ==== Zoom ==== */
+function zoom(dir) {
+  scale = Math.min(5.0, Math.max(0.2, scale + dir * 0.1));
+  draw();
+}
+
+/* ==== Undo ==== */
+function undo() {
+  if (history.length > 0) {
+    let prev = history.pop();
+    maskCtx.putImageData(prev, 0, 0);
+    draw();
+  }
+}
+
+/* ==== Draw final canvas ==== */
+function draw() {
+  if (!img) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+
+  ctx.globalAlpha = 1.0;
+  ctx.drawImage(img, 0, 0);
+
+  ctx.globalAlpha = 0.5;
+  ctx.drawImage(maskCanvas, 0, 0);
+
+  ctx.restore();
+}
+
+/* ==== Download mask.png ==== */
+function downloadMask() {
+  let out = document.createElement("canvas");
+  out.width = img.width;
+  out.height = img.height;
+  let octx = out.getContext("2d");
+
+  octx.drawImage(maskCanvas, 0, 0);
+
+  let link = document.createElement("a");
+  link.download = "mask.png";
+  link.href = out.toDataURL("image/png");
+  link.click();
+}
+</script>
+
+</body>
+</html>
