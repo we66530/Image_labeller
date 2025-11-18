@@ -29,7 +29,8 @@
 
   &nbsp;&nbsp; 
   <button onclick="undo()">Undo</button>
-  <button onclick="downloadMask()">Download Mask</button>
+  <button onclick="downloadMask()">Download RGB Mask</button>
+  <button onclick="downloadBinaryMask()">Download Binary Mask</button>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -53,7 +54,7 @@ const classSelect = document.getElementById("classSelect");
 
 /* ==== STATE ==== */
 let img = null;
-let maskCanvas = document.createElement("canvas");   // stores class id mask
+let maskCanvas = document.createElement("canvas");   // stores class id mask (RGB colors but easy to decode)
 let maskCtx = maskCanvas.getContext("2d");
 
 let scale = 1.0;
@@ -94,7 +95,7 @@ upload.onchange = function(e) {
   reader.readAsDataURL(file);
 };
 
-/* ==== Brush size change ==== */
+/* ==== Brush size ==== */
 brushSlider.oninput = function() {
   brushVal.innerText = this.value;
 };
@@ -114,7 +115,6 @@ canvas.onmousedown = function(e) {
   } else {
     isDrawing = true;
     history.push(maskCtx.getImageData(0,0,maskCanvas.width,maskCanvas.height));
-
     drawDot(x, y);
   }
 
@@ -128,9 +128,7 @@ canvas.onmousemove = function(e) {
   let x = (e.offsetX - offsetX) / scale;
   let y = (e.offsetY - offsetY) / scale;
 
-  if (isDrawing) {
-    drawDot(x, y);
-  }
+  if (isDrawing) drawDot(x, y);
 
   if (isPanning) {
     offsetX += (e.offsetX - startX);
@@ -143,15 +141,13 @@ canvas.onmousemove = function(e) {
 
 canvas.onmouseup = () => { isDrawing = false; isPanning = false; };
 
-/* ==== Drawing onto mask ==== */
+/* ==== Painting ==== */
 function drawDot(x, y) {
   let size = parseInt(brushSlider.value);
-
   maskCtx.fillStyle = "rgb(" + classColors[currentClass].join(",") + ")";
   maskCtx.beginPath();
   maskCtx.arc(x, y, size, 0, Math.PI * 2);
   maskCtx.fill();
-
   draw();
 }
 
@@ -170,7 +166,7 @@ function undo() {
   }
 }
 
-/* ==== Draw final canvas ==== */
+/* ==== Draw final composite ==== */
 function draw() {
   if (!img) return;
 
@@ -189,7 +185,7 @@ function draw() {
   ctx.restore();
 }
 
-/* ==== Download mask.png ==== */
+/* ==== RGB Mask Export ==== */
 function downloadMask() {
   let out = document.createElement("canvas");
   out.width = img.width;
@@ -199,10 +195,51 @@ function downloadMask() {
   octx.drawImage(maskCanvas, 0, 0);
 
   let link = document.createElement("a");
-  link.download = "mask.png";
+  link.download = "mask_rgb.png";
   link.href = out.toDataURL("image/png");
   link.click();
 }
+
+/* ==== Binary Mask Export (class ID only) ==== */
+function downloadBinaryMask() {
+  let w = img.width, h = img.height;
+
+  let out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  let octx = out.getContext("2d");
+
+  let maskData = maskCtx.getImageData(0, 0, w, h);
+  let binaryData = octx.createImageData(w, h);
+
+  let rgbToClass = {};
+  for (let cid in classColors) {
+    let [r,g,b] = classColors[cid];
+    rgbToClass[r+","+g+","+b] = parseInt(cid);
+  }
+
+  for (let i = 0; i < maskData.data.length; i += 4) {
+    let r = maskData.data[i];
+    let g = maskData.data[i+1];
+    let b = maskData.data[i+2];
+
+    let key = r+","+g+","+b;
+    let cls = rgbToClass[key] || 0;
+
+    binaryData.data[i] = cls;
+    binaryData.data[i+1] = cls;
+    binaryData.data[i+2] = cls;
+    binaryData.data[i+3] = 255;
+  }
+
+  octx.putImageData(binaryData, 0, 0);
+
+  let link = document.createElement("a");
+  link.download = "mask_binary.png";
+  link.href = out.toDataURL("image/png");
+  link.click();
+}
+
 </script>
 
 </body>
