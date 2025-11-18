@@ -212,23 +212,19 @@ function downloadBinaryMask() {
   let maskData = maskCtx.getImageData(0, 0, w, h);
   let binaryData = octx.createImageData(w, h);
 
-  let rgbToClass = {};
-  for (let cid in classColors) {
-    let [r,g,b] = classColors[cid];
-    rgbToClass[r+","+g+","+b] = parseInt(cid);
-  }
-
   for (let i = 0; i < maskData.data.length; i += 4) {
     let r = maskData.data[i];
     let g = maskData.data[i+1];
     let b = maskData.data[i+2];
 
-    let key = r+","+g+","+b;
-    let cls = rgbToClass[key] || 0;
+    // Any non-black pixel means "masked"
+    let isMasked = (r !== 0 || g !== 0 || b !== 0);
 
-    binaryData.data[i] = cls;
-    binaryData.data[i+1] = cls;
-    binaryData.data[i+2] = cls;
+    let value = isMasked ? 255 : 0;
+
+    binaryData.data[i]   = value;
+    binaryData.data[i+1] = value;
+    binaryData.data[i+2] = value;
     binaryData.data[i+3] = 255;
   }
 
